@@ -1,0 +1,31 @@
+ip:
+  name: YUVP
+  version: v1
+  clock_mhz: 650
+  ports:
+    - name: CIN0
+      kind: cin
+      direction: in
+  dmas:
+    - name: RDMA_IN
+      direction: read
+      type: image
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU2
+      ppc: 2
+      hint: LLC_ALLOC
+      support_sbwc: true
+      pattern: raster
+    - name: WDMA_NR
+      direction: write
+      type: image
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU2
+      ppc: 2
+      hint: PARTIAL_ALLOC
+      support_sbwc: true
+      pattern: raster

@@ -1,0 +1,55 @@
+ip:
+  name: MFC
+  version: v7
+  clock_mhz: 533
+  ports:
+    - name: DIN0
+      kind: din
+      direction: in
+    - name: DIN_REF
+      kind: din
+      direction: in
+    - name: DOUT0
+      kind: dout
+      direction: out
+  dmas:
+    - name: RDMA_SRC
+      direction: read
+      type: image
+      bind: DIN0
+      bus_width_byte: 32
+      max_outstanding: 4
+      fifo_depth: 8
+      xiu_port: XIU1
+      ppc: 2
+      hint: LLC_ALLOC
+      support_sbwc: true
+      pattern: tile_2d
+      tile_width: 64
+      tile_height: 32
+    - name: RDMA_REF
+      direction: read
+      type: random_2d
+      bind: DIN_REF
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU1
+      hint: LLC_ALLOC
+      mv_range_x: 64
+      mv_range_y: 32
+      distribution: gaussian
+    - name: WDMA_REC
+      direction: write
+      type: image
+      bind: DOUT0
+      bus_width_byte: 32
+      max_outstanding: 4
+      fifo_depth: 8
+      xiu_port: XIU2
+      ppc: 2
+      hint: PARTIAL_ALLOC
+      support_sbwc: true
+      pattern: tile_2d
+      tile_width: 64
+      tile_height: 32

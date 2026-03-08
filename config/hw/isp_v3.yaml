@@ -1,0 +1,51 @@
+ip:
+  name: ISP
+  version: v3
+  clock_mhz: 800
+  ports:
+    - name: CIN0
+      kind: cin
+      direction: in
+    - name: COUT0
+      kind: cout
+      direction: out
+    - name: DOUT_STAT
+      kind: dout
+      direction: out
+  dmas:
+    - name: RDMA_BAYER
+      direction: read
+      type: image
+      bind: CIN0
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU0
+      ppc: 4
+      hint: LLC_ALLOC
+      support_sbwc: false
+      pattern: raster
+    - name: WDMA_YUV
+      direction: write
+      type: image
+      bind: COUT0
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU1
+      ppc: 4
+      hint: PARTIAL_ALLOC
+      support_sbwc: true
+      pattern: raster
+    - name: WDMA_STAT
+      direction: write
+      type: stat
+      bind: DOUT_STAT
+      bus_width_byte: 32
+      max_outstanding: 4
+      fifo_depth: 8
+      xiu_port: XIU0
+      hint: NO_ALLOC
+      support_sbwc: false
+      block_size_byte: 256
+      block_interval_cycle: 960

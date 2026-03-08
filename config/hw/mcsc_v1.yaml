@@ -1,0 +1,31 @@
+ip:
+  name: MCSC
+  version: v1
+  clock_mhz: 600
+  ports:
+    - name: CIN0
+      kind: cin
+      direction: in
+  dmas:
+    - name: WDMA_MAIN
+      direction: write
+      type: image
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU4
+      ppc: 2
+      hint: PARTIAL_ALLOC
+      support_sbwc: true
+      pattern: raster
+    - name: WDMA_DS
+      direction: write
+      type: image
+      bus_width_byte: 32
+      max_outstanding: 4
+      fifo_depth: 8
+      xiu_port: XIU4
+      ppc: 2
+      hint: NO_ALLOC
+      support_sbwc: false
+      pattern: raster

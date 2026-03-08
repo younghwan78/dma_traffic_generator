@@ -1,0 +1,21 @@
+ip:
+  name: Display
+  version: v2
+  clock_mhz: 600
+  ports:
+    - name: DIN0
+      kind: din
+      direction: in
+  dmas:
+    - name: RDMA_LAYER0
+      direction: read
+      type: image
+      bind: DIN0
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU3
+      ppc: 4
+      hint: LLC_ALLOC
+      support_sbwc: true
+      pattern: raster

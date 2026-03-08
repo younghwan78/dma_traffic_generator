@@ -1,0 +1,174 @@
+scenario:
+  name: ISP_preview_4K_30fps
+  duration_ns: 33333333.333
+  frame_count: 1
+ips:
+  - name: BYRP0
+    hw: byrp_v1.yaml
+    ports:
+      - name: COUT0
+        width: 3840
+        height: 2160
+        format: BAYER_10BIT
+    dmas:
+      - name: RDMA_IN
+        base_dva: 0x100000000
+        width: 3840
+        height: 2160
+        format: BAYER_10BIT
+        stride_byte: 5120
+        start_ns: 0
+      - name: WDMA_BYR
+        base_dva: 0x110000000
+        width: 3840
+        height: 2160
+        format: BAYER_10BIT
+        stride_byte: 5120
+        start_ns: 250
+      - name: WDMA_STAT
+        base_dva: 0x118000000
+        width: 40
+        height: 30
+        format: STAT
+        bitwidth: 16
+        grid_width: 96
+        grid_height: 72
+        start_ns: 500
+  - name: RGBP0
+    hw: rgbp_v1.yaml
+    timing_input_port: CIN0
+    ports:
+      - name: CIN0
+        width: 3840
+        height: 2160
+        format: BAYER_10BIT
+      - name: COUT0
+        width: 3840
+        height: 2160
+        format: YUV420_8BIT
+    start_condition:
+      policy: all
+      inputs:
+        - RGBP0.CIN0
+    dmas:
+      - name: WDMA_OUT
+        base_dva: 0x200000000
+        width: 3840
+        height: 2160
+        format: YUV420_8BIT
+        stride_byte: 4096
+        sbwc: true
+        sbwc_align_byte: 32
+        comp_ratio: 0.62
+        start_ns: 0
+  - name: YUVP0
+    hw: yuvp_v1.yaml
+    timing_input_port: CIN0
+    ports:
+      - name: CIN0
+        width: 3840
+        height: 2160
+        format: YUV420_8BIT
+    start_condition:
+      policy: all
+      inputs:
+        - YUVP0.CIN0
+    dmas:
+      - name: WDMA_NR
+        base_dva: 0x220000000
+        width: 3840
+        height: 2160
+        format: YUV420_8BIT
+        stride_byte: 4096
+        sbwc: true
+        sbwc_align_byte: 32
+        comp_ratio: 0.58
+        start_ns: 150
+  - name: MCFP0
+    hw: mcfp_v1.yaml
+    timing_input_port: CIN0
+    ports:
+      - name: CIN0
+        width: 3840
+        height: 2160
+        format: YUV420_8BIT
+      - name: COUT0
+        width: 3840
+        height: 2160
+        format: YUV420_8BIT
+    start_condition:
+      policy: all
+      inputs:
+        - MCFP0.CIN0
+        - MCFP0.RDMA_REF
+    dmas:
+      - name: RDMA_REF
+        timing_from_port: CIN0
+        base_dva: 0x310000000
+        width: 3840
+        height: 2160
+        format: YUV420_8BIT
+        stride_byte: 4096
+        sbwc: true
+        sbwc_align_byte: 32
+        comp_ratio: 0.58
+        start_ns: 0
+      - name: WDMA_OUT
+        base_dva: 0x320000000
+        width: 3840
+        height: 2160
+        format: YUV420_8BIT
+        stride_byte: 4096
+        sbwc: true
+        sbwc_align_byte: 32
+        comp_ratio: 0.55
+        start_ns: 300
+  - name: MCSC0
+    hw: mcsc_v1.yaml
+    timing_input_port: CIN0
+    ports:
+      - name: CIN0
+        width: 3840
+        height: 2160
+        format: YUV420_8BIT
+    start_condition:
+      policy: all
+      inputs:
+        - MCSC0.CIN0
+    dmas:
+      - name: WDMA_MAIN
+        base_dva: 0x410000000
+        width: 3840
+        height: 2160
+        format: YUV420_8BIT
+        stride_byte: 4096
+        sbwc: true
+        sbwc_align_byte: 32
+        comp_ratio: 0.5
+        start_ns: 400
+      - name: WDMA_DS
+        timing_from_port: CIN0
+        base_dva: 0x420000000
+        width: 1920
+        height: 1080
+        format: YUV420_8BIT
+        stride_byte: 2048
+        sbwc: false
+        start_ns: 450
+links:
+  - from: BYRP0.COUT0
+    to: RGBP0.CIN0
+    type: otf
+  - from: RGBP0.COUT0
+    to: YUVP0.CIN0
+    type: otf
+  - from: RGBP0.COUT0
+    to: MCFP0.CIN0
+    type: otf
+  - from: YUVP0.WDMA_NR
+    to: MCFP0.RDMA_REF
+    type: m2m
+    delta_ns: 0
+  - from: MCFP0.COUT0
+    to: MCSC0.CIN0
+    type: otf

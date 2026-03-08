@@ -1,0 +1,133 @@
+scenario:
+  name: ISP_capture_4K
+  duration_ns: 40000000
+  frame_count: 1
+ips:
+  - name: BYRP0
+    hw: byrp_v1.yaml
+    ports:
+      - name: COUT0
+        width: 3840
+        height: 2160
+        format: BAYER_12BIT
+    dmas:
+      - name: RDMA_IN
+        base_dva: 0x110000000
+        width: 3840
+        height: 2160
+        format: BAYER_12BIT
+        stride_byte: 6144
+        start_ns: 0
+      - name: WDMA_BYR
+        base_dva: 0x120000000
+        width: 3840
+        height: 2160
+        format: BAYER_12BIT
+        stride_byte: 6144
+        start_ns: 250
+      - name: WDMA_STAT
+        base_dva: 0x128000000
+        width: 40
+        height: 30
+        format: STAT
+        bitwidth: 16
+        grid_width: 96
+        grid_height: 72
+        start_ns: 500
+  - name: RGBP0
+    hw: rgbp_v1.yaml
+    timing_input_port: CIN0
+    ports:
+      - name: CIN0
+        width: 3840
+        height: 2160
+        format: BAYER_12BIT
+      - name: COUT0
+        width: 3840
+        height: 2160
+        format: YUV420_10BIT
+    start_condition:
+      policy: all
+      inputs:
+        - RGBP0.CIN0
+    dmas:
+      - name: WDMA_OUT
+        base_dva: 0x220000000
+        width: 3840
+        height: 2160
+        format: YUV420_10BIT
+        stride_byte: 6144
+        sbwc: true
+        sbwc_align_byte: 64
+        comp_ratio: 0.55
+        start_ns: 0
+  - name: MCSC0
+    hw: mcsc_v1.yaml
+    timing_input_port: CIN0
+    ports:
+      - name: CIN0
+        width: 3840
+        height: 2160
+        format: YUV420_10BIT
+    start_condition:
+      policy: all
+      inputs:
+        - MCSC0.CIN0
+    dmas:
+      - name: WDMA_MAIN
+        base_dva: 0x320000000
+        width: 3840
+        height: 2160
+        format: YUV420_10BIT
+        stride_byte: 6144
+        sbwc: true
+        sbwc_align_byte: 64
+        comp_ratio: 0.5
+        start_ns: 300
+      - name: WDMA_DS
+        timing_from_port: CIN0
+        base_dva: 0x330000000
+        width: 1920
+        height: 1080
+        format: YUV420_8BIT
+        stride_byte: 2048
+        sbwc: false
+        start_ns: 400
+  - name: YUVP0
+    hw: yuvp_v1.yaml
+    start_condition:
+      policy: all
+      inputs:
+        - YUVP0.RDMA_IN
+    dmas:
+      - name: RDMA_IN
+        base_dva: 0x340000000
+        width: 3840
+        height: 2160
+        format: YUV420_10BIT
+        stride_byte: 6144
+        sbwc: true
+        sbwc_align_byte: 64
+        comp_ratio: 0.5
+        start_ns: 0
+      - name: WDMA_NR
+        base_dva: 0x350000000
+        width: 3840
+        height: 2160
+        format: YUV420_10BIT
+        stride_byte: 6144
+        sbwc: true
+        sbwc_align_byte: 64
+        comp_ratio: 0.5
+        start_ns: 200
+links:
+  - from: BYRP0.COUT0
+    to: RGBP0.CIN0
+    type: otf
+  - from: RGBP0.COUT0
+    to: MCSC0.CIN0
+    type: otf
+  - from: MCSC0.WDMA_MAIN
+    to: YUVP0.RDMA_IN
+    type: m2m
+    delta_ns: 0

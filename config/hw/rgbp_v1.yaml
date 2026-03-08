@@ -1,0 +1,24 @@
+ip:
+  name: RGBP
+  version: v1
+  clock_mhz: 700
+  ports:
+    - name: CIN0
+      kind: cin
+      direction: in
+    - name: COUT0
+      kind: cout
+      direction: out
+  dmas:
+    - name: WDMA_OUT
+      direction: write
+      type: image
+      bind: COUT0
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU2
+      ppc: 4
+      hint: PARTIAL_ALLOC
+      support_sbwc: true
+      pattern: raster
