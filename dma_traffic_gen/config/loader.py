@@ -12,7 +12,7 @@ from dma_traffic_gen.config.scenario_schema import (
     ScenarioConfig,
 )
 from dma_traffic_gen.config.yaml_io import load_yaml
-from dma_traffic_gen.formats import plane_specs, stat_cell_size_byte
+from dma_traffic_gen.formats import align_up, plane_specs, stat_cell_size_byte
 
 
 @dataclass(slots=True)
@@ -67,6 +67,10 @@ class MergedDMAConfig:
     access_count: int | None
     interval_cycle: int | None
     seed: int | None
+    mtnr_role: str | None
+    pyramid_level: int | None
+    alignment_byte: int
+    buffer_height: int | None
     bind: str | None = None
     timing_width: int | None = None
     timing_height: int | None = None
@@ -214,6 +218,10 @@ class ConfigLoader:
             access_count=sc.access_count,
             interval_cycle=sc.interval_cycle,
             seed=sc.seed,
+            mtnr_role=sc.mtnr_role,
+            pyramid_level=sc.pyramid_level,
+            alignment_byte=sc.alignment_byte,
+            buffer_height=sc.buffer_height,
             bind=hw.bind,
             timing_width=sc.width,
             timing_height=sc.height,
@@ -318,6 +326,29 @@ class ConfigLoader:
                     report.warnings.append(
                         f"{cfg.name}: stride_byte={stride} > width_byte={width_byte}, padding={stride - width_byte} bytes/line"
                     )
+            if cfg.type == "mtnr":
+                if cfg.mtnr_role not in {"current", "previous", "output"}:
+                    report.errors.append(f"{cfg.name}: mtnr DMA requires mtnr_role in [current, previous, output]")
+                if not cfg.format:
+                    report.errors.append(f"{cfg.name}: mtnr DMA requires format")
+                    continue
+                if not cfg.width or not cfg.height:
+                    report.errors.append(f"{cfg.name}: mtnr DMA requires width and height")
+                    continue
+                if cfg.mtnr_role != "current" and cfg.pyramid_level is None:
+                    report.errors.append(f"{cfg.name}: mtnr pyramid DMA requires pyramid_level")
+                if cfg.pyramid_level is not None and cfg.pyramid_level not in {0, 1, 2, 3, 4}:
+                    report.errors.append(f"{cfg.name}: pyramid_level must be in [0, 4]")
+                width_byte = self._width_byte(cfg)
+                stride = cfg.stride_byte or align_up(width_byte, cfg.alignment_byte)
+                if stride < width_byte:
+                    report.errors.append(f"{cfg.name}: stride_byte={stride} < width_byte={width_byte}")
+                if stride > width_byte:
+                    report.warnings.append(
+                        f"{cfg.name}: stride_byte={stride} > width_byte={width_byte}, padding={stride - width_byte} bytes/line"
+                    )
+                if cfg.buffer_height is not None and cfg.buffer_height < cfg.height:
+                    report.errors.append(f"{cfg.name}: buffer_height must be >= height")
             if cfg.type == "stat":
                 if not cfg.width or not cfg.height:
                     report.errors.append(f"{cfg.name}: stat DMA requires output width and height")
@@ -469,6 +500,10 @@ class ConfigLoader:
         if cfg.type == "stat":
             total = cfg.stat_cell_size_byte * cfg.stat_block_count
             return cfg.base_dva, cfg.base_dva + total
+        if cfg.type == "mtnr":
+            stride = cfg.stride_byte or align_up(self._width_byte(cfg), cfg.alignment_byte)
+            height = cfg.buffer_height or cfg.height or 1
+            return cfg.base_dva, cfg.base_dva + stride * height
         if cfg.type.startswith("random"):
             stride = cfg.stride_byte or cfg.txn_size_byte
             height = cfg.height or 1

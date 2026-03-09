@@ -38,6 +38,7 @@ def format_bpp(fmt: str) -> float:
         "BAYER_12BIT": 1.5,
         "YUV444_8BIT": 3.0,
         "YUV444_10BIT": 3.75,
+        "YUV444_12BIT": 6.0,
         "YUV422_8BIT": 2.0,
         "YUV422_10BIT": 2.5,
         "YUV422_12BIT": 3.0,

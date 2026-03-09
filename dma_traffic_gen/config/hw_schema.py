@@ -5,7 +5,7 @@ from typing import Literal
 
 
 Direction = Literal["read", "write"]
-DMAType = Literal["image", "stat", "random_1d", "random_2d"]
+DMAType = Literal["image", "stat", "random_1d", "random_2d", "mtnr"]
 HintType = Literal["LLC_ALLOC", "NO_ALLOC", "PARTIAL_ALLOC"]
 PatternType = Literal["raster", "tile_2d"]
 DistributionType = Literal["uniform", "gaussian", "hotspot"]
@@ -54,9 +54,9 @@ class DMAHWConfig:
     def validate(self) -> None:
         if self.bus_width_byte not in {16, 32}:
             raise ValueError(f"{self.name}: bus_width_byte must be 16 or 32")
-        if self.type == "image":
+        if self.type in {"image", "mtnr"}:
             if self.ppc not in {1, 2, 4, 8}:
-                raise ValueError(f"{self.name}: image DMA requires ppc in [1,2,4,8]")
+                raise ValueError(f"{self.name}: {self.type} DMA requires ppc in [1,2,4,8]")
             if self.pattern == "tile_2d" and (not self.tile_width or not self.tile_height):
                 raise ValueError(f"{self.name}: tile_2d pattern requires tile_width and tile_height")
         if self.type == "stat":

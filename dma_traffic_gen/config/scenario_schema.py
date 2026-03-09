@@ -24,6 +24,10 @@ class DMAScenarioConfig:
     access_count: int | None = None
     interval_cycle: int | None = None
     seed: int | None = None
+    mtnr_role: str | None = None
+    pyramid_level: int | None = None
+    alignment_byte: int = 64
+    buffer_height: int | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> "DMAScenarioConfig":
@@ -44,6 +48,12 @@ class DMAScenarioConfig:
             raise ValueError(f"{self.name}: grid_width must be positive")
         if self.grid_height is not None and self.grid_height <= 0:
             raise ValueError(f"{self.name}: grid_height must be positive")
+        if self.alignment_byte <= 0:
+            raise ValueError(f"{self.name}: alignment_byte must be positive")
+        if self.buffer_height is not None and self.buffer_height <= 0:
+            raise ValueError(f"{self.name}: buffer_height must be positive")
+        if self.pyramid_level is not None and self.pyramid_level < 0:
+            raise ValueError(f"{self.name}: pyramid_level must be non-negative")
 
 
 @dataclass(slots=True)

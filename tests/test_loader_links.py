@@ -41,3 +41,27 @@ def test_loader_resolves_instance_links() -> None:
     assert port_map["RGBP0.CIN0"].width == 3840
     assert port_map["RGBP0.CIN0"].height == 2160
     assert port_map["RGBP0.COUT0"].format == "YUV420_8BIT"
+
+
+def test_loader_resolves_mtnr_m2m_scenario() -> None:
+    loader = ConfigLoader()
+    merged, _scenario = loader.load("config/scenario/isp_capture_4k_mtnr.yaml", "config/hw")
+
+    merged_names = {cfg.name for cfg in merged}
+    assert "MTNR0.RDMA_CUR" in merged_names
+    assert "MTNR0.RDMA_PREV_L4" in merged_names
+    assert "MTNR0.WDMA_OUT_L0" in merged_names
+
+    current_cfg = next(cfg for cfg in merged if cfg.name == "MTNR0.RDMA_CUR")
+    prev_l4_cfg = next(cfg for cfg in merged if cfg.name == "MTNR0.RDMA_PREV_L4")
+    out_l1_cfg = next(cfg for cfg in merged if cfg.name == "MTNR0.WDMA_OUT_L1")
+
+    assert current_cfg.type == "mtnr"
+    assert current_cfg.mtnr_role == "current"
+    assert prev_l4_cfg.pyramid_level == 4
+    assert out_l1_cfg.mtnr_role == "output"
+    assert out_l1_cfg.pyramid_level == 1
+
+    links = loader.last_links
+    assert any(link.from_endpoint == "RGBP0.WDMA_OUT" and link.to_endpoint == "MTNR0.RDMA_CUR" for link in links)
+    assert any(link.from_endpoint == "MTNR0.WDMA_OUT_L0" and link.to_endpoint == "YUVP0.RDMA_IN" for link in links)

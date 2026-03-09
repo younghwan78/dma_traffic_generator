@@ -1,0 +1,104 @@
+ip:
+  name: MTNR
+  version: v1
+  clock_mhz: 650
+  dmas:
+    - name: RDMA_CUR
+      direction: read
+      type: mtnr
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU3
+      ppc: 2
+      hint: LLC_ALLOC
+    - name: RDMA_PREV_L0
+      direction: read
+      type: mtnr
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU3
+      ppc: 2
+      hint: LLC_ALLOC
+    - name: RDMA_PREV_L1
+      direction: read
+      type: mtnr
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU3
+      ppc: 2
+      hint: LLC_ALLOC
+    - name: RDMA_PREV_L2
+      direction: read
+      type: mtnr
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU3
+      ppc: 2
+      hint: LLC_ALLOC
+    - name: RDMA_PREV_L3
+      direction: read
+      type: mtnr
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU3
+      ppc: 2
+      hint: LLC_ALLOC
+    - name: RDMA_PREV_L4
+      direction: read
+      type: mtnr
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU3
+      ppc: 2
+      hint: LLC_ALLOC
+    - name: WDMA_OUT_L0
+      direction: write
+      type: mtnr
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU4
+      ppc: 2
+      hint: PARTIAL_ALLOC
+    - name: WDMA_OUT_L1
+      direction: write
+      type: mtnr
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU4
+      ppc: 2
+      hint: PARTIAL_ALLOC
+    - name: WDMA_OUT_L2
+      direction: write
+      type: mtnr
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU4
+      ppc: 2
+      hint: PARTIAL_ALLOC
+    - name: WDMA_OUT_L3
+      direction: write
+      type: mtnr
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU4
+      ppc: 2
+      hint: PARTIAL_ALLOC
+    - name: WDMA_OUT_L4
+      direction: write
+      type: mtnr
+      bus_width_byte: 32
+      max_outstanding: 8
+      fifo_depth: 16
+      xiu_port: XIU4
+      ppc: 2
+      hint: PARTIAL_ALLOC

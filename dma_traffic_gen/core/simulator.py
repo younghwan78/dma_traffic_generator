@@ -6,6 +6,7 @@ from dma_traffic_gen.config.loader import MergedDMAConfig, ResolvedLink
 from dma_traffic_gen.config.scenario_schema import IPScenarioConfig, ScenarioConfig
 from dma_traffic_gen.core.transaction import Transaction
 from dma_traffic_gen.dma.image_dma import ImageDMA
+from dma_traffic_gen.dma.mtnr_dma import MTNRDMA
 from dma_traffic_gen.dma.random_dma import RandomDMA
 from dma_traffic_gen.dma.stat_dma import StatDMA
 
@@ -102,6 +103,8 @@ class TrafficSimulator:
     def _instantiate_dma(self, cfg: MergedDMAConfig):
         if cfg.type == "image":
             return ImageDMA(cfg)
+        if cfg.type == "mtnr":
+            return MTNRDMA(cfg)
         if cfg.type == "stat":
             return StatDMA(cfg)
         if cfg.type.startswith("random"):

@@ -2,6 +2,7 @@
 
 모바일 SoC 멀티미디어 IP의 DMA traffic을 생성하는 Python 기반 CLI 도구입니다.  
 현재 구현은 ISP 계열 예제 시나리오를 기준으로 `OTF`, `M2M`, `SBWC`, `stat`, `random` DMA를 함께 다룹니다.
+또한 MTNR용 피라미드 기반 `mtnr` DMA 모델과 M2M 예제 scenario를 포함합니다.
 
 ## 개요
 
@@ -143,10 +144,12 @@ HW 예제:
 - `config/hw/yuvp_v1.yaml`
 - `config/hw/mcfp_v1.yaml`
 - `config/hw/mcsc_v1.yaml`
+- `config/hw/mtnr_v1.yaml`
 
 시나리오 예제:
 - `config/scenario/isp_preview_4k_30fps.yaml`
 - `config/scenario/isp_capture_4k.yaml`
+- `config/scenario/isp_capture_4k_mtnr.yaml`
 
 ## 구현 메모
 
