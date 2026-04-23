@@ -28,6 +28,7 @@ python -m dma_traffic_gen run config/scenario/isp_preview_4k_30fps.yaml --hw-dir
 ## 주요 명령
 
 - `run`: traffic 생성, summary 생성, graph 생성
+  - `--split-by-dma` 옵션 사용 시 DMA 포트별로 개별 `traffic_*.txt` 파일을 분리 생성
 - `validate`: YAML 로드/merge/교차 검증만 수행
 - `summary`: 기존 `traffic.txt`로부터 `summary.txt`, `bw_plot.html` 재생성
 - `filter`: 포트/XIU/시간 범위 기준으로 trace 일부 추출
@@ -36,7 +37,7 @@ python -m dma_traffic_gen run config/scenario/isp_preview_4k_30fps.yaml --hw-dir
 
 ```bash
 python -m dma_traffic_gen validate config/scenario/isp_preview_4k_30fps.yaml --hw-dir config/hw
-python -m dma_traffic_gen run config/scenario/isp_preview_4k_30fps.yaml --hw-dir config/hw -o output --window-us 10
+python -m dma_traffic_gen run config/scenario/isp_preview_4k_30fps.yaml --hw-dir config/hw -o output --window-us 10 --split-by-dma
 python -m dma_traffic_gen summary output/traffic.txt -o output --window-us 100
 python -m dma_traffic_gen filter output/traffic.txt --port BYRP0.WDMA_STAT --ts-from 0 --ts-to 2000000 -o filtered.txt
 ```
