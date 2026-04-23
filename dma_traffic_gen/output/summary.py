@@ -141,6 +141,16 @@ class SummaryGenerator:
             "dma_summary": dma_summary,
             "xiu_summary": xiu_summary,
             "validation": validation,
+            "links": [
+                {
+                    "from": link.from_endpoint,
+                    "to": link.to_endpoint,
+                    "type": link.type,
+                    "sw_task": getattr(link, "sw_task", None),
+                    "delay_ns": getattr(link, "delay_ns", link.delta_ns)
+                }
+                for link in getattr(scenario, "links", [])
+            ],
         }
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         Path(output_path).write_text(self._format_text(data), encoding="utf-8")

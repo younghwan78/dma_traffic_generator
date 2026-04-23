@@ -116,6 +116,8 @@ class LinkConfig:
     to_endpoint: str
     type: Literal["m2m", "otf"]
     delta_ns: float = 0.0
+    sw_task: str | None = None
+    delay_ns: float | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> "LinkConfig":
@@ -123,7 +125,9 @@ class LinkConfig:
             from_endpoint=str(data["from"]),
             to_endpoint=str(data["to"]),
             type=str(data["type"]),
-            delta_ns=float(data.get("delta_ns", 0.0)),
+            delta_ns=float(data.get("delay_ns", data.get("delta_ns", 0.0))),
+            sw_task=str(data["sw_task"]) if "sw_task" in data else None,
+            delay_ns=float(data.get("delay_ns", data.get("delta_ns", 0.0))) if "delay_ns" in data or "delta_ns" in data else None,
         )
         if link.delta_ns < 0:
             raise ValueError("dependency delta_ns must be non-negative")
