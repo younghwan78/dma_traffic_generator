@@ -1,6 +1,6 @@
 .venv/
 .pytest_tmp/
-output/
+/output/
 __pycache__/
 *.pyc
 traffic_generator_spec.md

@@ -33,10 +33,13 @@ class TrafficSimulator:
         all_txns: list[Transaction] = []
         frame_base_ns = 0.0
 
+        otf_bottlenecks = self._calculate_otf_bottlenecks()
+
         for _frame_idx in range(self.frame_count):
             frame_last_txn: dict[str, Transaction] = {}
             frame_complete_ns_by_dma: dict[str, float] = {}
             frame_complete_ns_by_instance: dict[str, float] = {}
+            frame_ready_ns_by_instance: dict[str, float] = {}
             frame_max_ts = frame_base_ns
 
             for instance_name in instance_order:
@@ -46,21 +49,25 @@ class TrafficSimulator:
                     frame_base_ns,
                     frame_complete_ns_by_dma,
                     frame_complete_ns_by_instance,
+                    frame_ready_ns_by_instance,
                     relevant_links,
                 )
+                frame_ready_ns_by_instance[instance_name] = instance_ready_ns
                 instance_max_ts = instance_ready_ns
 
                 for cfg in dmas_by_instance.get(instance_name, []):
-                    start_ns = max(frame_base_ns + cfg.start_ns, instance_ready_ns)
+                    start_ns = instance_ready_ns + cfg.start_ns
                     dep_ref, dep_delta = self._resolve_dma_dependency(
                         cfg,
                         frame_base_ns,
                         frame_complete_ns_by_dma,
                         frame_complete_ns_by_instance,
+                        frame_ready_ns_by_instance,
                         relevant_links,
                     )
                     dma = self._instantiate_dma(cfg)
-                    txns = dma.generate_transactions(start_ns, dep_ref=dep_ref, delta_ns=dep_delta)
+                    bottleneck_ns = otf_bottlenecks.get(instance_name)
+                    txns = dma.generate_transactions(start_ns, dep_ref=dep_ref, delta_ns=dep_delta, override_duration_ns=bottleneck_ns)
                     if self.duration_ns > 0:
                         frame_end = frame_base_ns + self.duration_ns
                         truncated = [txn for txn in txns if txn.ts_ns < frame_end]
@@ -68,10 +75,11 @@ class TrafficSimulator:
                             self.warnings.append(f"{cfg.name}: duration_ns={self.duration_ns} exceeded, frame truncated")
                         txns = truncated
                     if txns:
-                        frame_last_txn[cfg.name] = txns[-1]
-                        frame_complete_ns_by_dma[cfg.name] = txns[-1].ts_ns
-                        frame_max_ts = max(frame_max_ts, txns[-1].ts_ns)
-                        instance_max_ts = max(instance_max_ts, txns[-1].ts_ns)
+                        max_ts = max(txn.ts_ns for txn in txns)
+                        frame_last_txn[cfg.name] = next(t for t in txns if t.ts_ns == max_ts)
+                        frame_complete_ns_by_dma[cfg.name] = max_ts
+                        frame_max_ts = max(frame_max_ts, max_ts)
+                        instance_max_ts = max(instance_max_ts, max_ts)
                         all_txns.extend(txns)
 
                 frame_complete_ns_by_instance[instance_name] = instance_max_ts
@@ -125,12 +133,47 @@ class TrafficSimulator:
             by_instance[link.to_instance].append(link)
         return by_instance
 
+    def _otf_groups(self) -> list[set[str]]:
+        groups: list[set[str]] = []
+        for instance in self._ip_map.keys():
+            if any(instance in group for group in groups):
+                continue
+            queue = [instance]
+            current_group = set([instance])
+            while queue:
+                curr = queue.pop(0)
+                for link in self.links:
+                    if link.type == "otf":
+                        if link.from_instance == curr and link.to_instance not in current_group:
+                            current_group.add(link.to_instance)
+                            queue.append(link.to_instance)
+                        elif link.to_instance == curr and link.from_instance not in current_group:
+                            current_group.add(link.from_instance)
+                            queue.append(link.from_instance)
+            groups.append(current_group)
+        return groups
+
+    def _calculate_otf_bottlenecks(self) -> dict[str, float]:
+        bottlenecks: dict[str, float] = {}
+        dmas_by_instance = self._dmas_by_instance()
+        groups = self._otf_groups()
+        for group in groups:
+            max_duration = 0.0
+            for instance in group:
+                for cfg in dmas_by_instance.get(instance, []):
+                    dma = self._instantiate_dma(cfg)
+                    max_duration = max(max_duration, dma.natural_duration_ns())
+            for instance in group:
+                bottlenecks[instance] = max_duration
+        return bottlenecks
+
     def _resolve_instance_ready(
         self,
         instance_name: str,
         frame_base_ns: float,
         frame_complete_ns_by_dma: dict[str, float],
         frame_complete_ns_by_instance: dict[str, float],
+        frame_ready_ns_by_instance: dict[str, float],
         links: list[ResolvedLink],
     ) -> float:
         if not links:
@@ -143,6 +186,7 @@ class TrafficSimulator:
                 frame_base_ns,
                 frame_complete_ns_by_dma,
                 frame_complete_ns_by_instance,
+                frame_ready_ns_by_instance,
             )
             candidates.append(source_ready_ns + link.delta_ns)
 
@@ -163,6 +207,7 @@ class TrafficSimulator:
         frame_base_ns: float,
         frame_complete_ns_by_dma: dict[str, float],
         frame_complete_ns_by_instance: dict[str, float],
+        frame_ready_ns_by_instance: dict[str, float],
         links: list[ResolvedLink],
     ) -> tuple[str | None, float | None]:
         if cfg.direction != "read":
@@ -177,6 +222,7 @@ class TrafficSimulator:
                 frame_base_ns,
                 frame_complete_ns_by_dma,
                 frame_complete_ns_by_instance,
+                frame_ready_ns_by_instance,
             )
             candidates.append((source_ready_ns + link.delta_ns, source_dma, link.delta_ns if source_dma else None))
 
@@ -192,11 +238,12 @@ class TrafficSimulator:
         frame_base_ns: float,
         frame_complete_ns_by_dma: dict[str, float],
         frame_complete_ns_by_instance: dict[str, float],
+        frame_ready_ns_by_instance: dict[str, float],
     ) -> tuple[float, str | None]:
         if link.type == "m2m":
             ready_ns = frame_complete_ns_by_dma.get(link.from_endpoint, frame_base_ns)
             return ready_ns, link.from_endpoint
-        return frame_complete_ns_by_instance.get(link.from_instance, frame_base_ns), None
+        return frame_ready_ns_by_instance.get(link.from_instance, frame_base_ns), None
 
     def _topological_order(self) -> list[str]:
         graph: dict[str, set[str]] = {ip.name: set() for ip in self.scenario.ips}

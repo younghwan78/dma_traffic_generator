@@ -14,6 +14,11 @@ class SBWCLayout:
     height: int
     sbwc_align_byte: int
     comp_ratio: float
+    bpp: float = 0.0
+
+    def __post_init__(self):
+        if self.bpp == 0.0:
+            self.bpp = format_bpp(self.format)
 
     def aligned_width(self) -> int:
         if is_bayer_format(self.format):
@@ -31,7 +36,7 @@ class SBWCLayout:
         return align_up(max(16, blocks_per_line * 16), self.sbwc_align_byte)
 
     def payload_line_size_byte(self) -> int:
-        raw_line_byte = ceil(self.aligned_width() * format_bpp(self.format))
+        raw_line_byte = ceil(self.aligned_width() * self.bpp)
         return align_up(ceil(raw_line_byte * self.comp_ratio), self.sbwc_align_byte)
 
     def header_total_size_byte(self) -> int:

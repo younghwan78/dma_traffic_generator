@@ -26,11 +26,15 @@ class BaseDMA:
     def burst_type(self) -> str:
         return "INCR"
 
+    def natural_duration_ns(self) -> float:
+        return 0.0
+
     def generate_transactions(
         self,
         start_ns: float,
         dep_ref: str | None = None,
         delta_ns: float | None = None,
+        override_duration_ns: float | None = None,
     ) -> list[Transaction]:
         raise NotImplementedError
 

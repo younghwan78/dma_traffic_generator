@@ -4,11 +4,18 @@ from dma_traffic_gen.dma.base import BaseDMA
 
 
 class StatDMA(BaseDMA):
+    def natural_duration_ns(self) -> float:
+        output_width = self.config.width or 0
+        output_height = self.config.height or 0
+        interval_ns = self.clock.cycles_to_ns(self.config.block_interval_cycle or 1)
+        return output_width * output_height * interval_ns
+
     def generate_transactions(
         self,
         start_ns: float,
         dep_ref: str | None = None,
         delta_ns: float | None = None,
+        override_duration_ns: float | None = None,
     ) -> list:
         txns = []
         block_size = self.config.stat_cell_size_byte
@@ -17,6 +24,10 @@ class StatDMA(BaseDMA):
         interval_ns = self.clock.cycles_to_ns(self.config.block_interval_cycle or 1)
         first_dep = dep_ref
         first_delta = delta_ns
+
+        if override_duration_ns is not None and override_duration_ns > (output_width * output_height * interval_ns):
+            total_blocks = max(1, output_width * output_height)
+            interval_ns = override_duration_ns / total_blocks
 
         for grid_y in range(output_height):
             for grid_x in range(output_width):

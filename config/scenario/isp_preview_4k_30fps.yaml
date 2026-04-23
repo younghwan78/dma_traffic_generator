@@ -168,7 +168,7 @@ links:
   - from: YUVP0.WDMA_NR
     to: MCFP0.RDMA_REF
     type: m2m
-    delta_ns: 0
+    delta_ns: 4000000
   - from: MCFP0.COUT0
     to: MCSC0.CIN0
     type: otf

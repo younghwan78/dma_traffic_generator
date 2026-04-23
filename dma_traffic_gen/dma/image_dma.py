@@ -18,17 +18,26 @@ class ImageDMA(BaseDMA):
         cycles = ceil(width_px / (self.config.ppc or 1))
         return self.clock.cycles_to_ns(cycles)
 
+    def natural_duration_ns(self) -> float:
+        timing_planes = self._timing_planes()
+        if not timing_planes:
+            return 0.0
+        timing_plane = timing_planes[0]
+        line_window_ns = max(0.001, self.line_interval_ns(timing_plane.width_px))
+        return max(line_window_ns, line_window_ns * max(1, timing_plane.height_px))
+
     def generate_transactions(
         self,
         start_ns: float,
         dep_ref: str | None = None,
         delta_ns: float | None = None,
+        override_duration_ns: float | None = None,
     ) -> list:
         if self.config.sbwc:
-            return self._generate_sbwc(start_ns, dep_ref, delta_ns)
+            return self._generate_sbwc(start_ns, dep_ref, delta_ns, override_duration_ns)
         if self.config.pattern == "tile_2d":
-            return self._generate_tile(start_ns, dep_ref, delta_ns)
-        return self._generate_raster(start_ns, dep_ref, delta_ns)
+            return self._generate_tile(start_ns, dep_ref, delta_ns, override_duration_ns)
+        return self._generate_raster(start_ns, dep_ref, delta_ns, override_duration_ns)
 
     def _plane_stride(self, plane: PlaneSpec) -> int:
         if plane.name == "Y":
@@ -41,28 +50,27 @@ class ImageDMA(BaseDMA):
         return plane_specs(self.config.format or "", self.config.width or 0, self.config.height or 0)
 
     def _timing_plane(self, plane: PlaneSpec, timing_planes: list[PlaneSpec], plane_idx: int) -> PlaneSpec:
-        for candidate in timing_planes:
-            if candidate.name == plane.name:
-                return candidate
-        if plane_idx < len(timing_planes):
-            return timing_planes[plane_idx]
+        if timing_planes:
+            return timing_planes[0]
         return plane
 
-    def _line_timing(self, plane: PlaneSpec, timing_plane: PlaneSpec) -> tuple[float, float]:
+    def _line_timing(self, plane: PlaneSpec, timing_plane: PlaneSpec, override_duration_ns: float | None = None) -> tuple[float, float]:
         line_window_ns = max(0.001, self.line_interval_ns(timing_plane.width_px))
         total_timing_ns = max(line_window_ns, line_window_ns * max(1, timing_plane.height_px))
+        if override_duration_ns is not None and override_duration_ns > total_timing_ns:
+            total_timing_ns = override_duration_ns
         line_count = max(1, plane.height_px)
         line_step_ns = max(0.001, total_timing_ns / line_count)
         return line_window_ns, line_step_ns
 
-    def _generate_raster(self, start_ns: float, dep_ref: str | None, delta_ns: float | None) -> list:
+    def _generate_raster(self, start_ns: float, dep_ref: str | None, delta_ns: float | None, override_duration_ns: float | None) -> list:
         txns = []
         first_dep = dep_ref
         first_delta = delta_ns
         timing_planes = self._timing_planes()
         for plane_idx, plane in enumerate(plane_specs(self.config.format or "", self.config.width or 0, self.config.height or 0)):
             timing_plane = self._timing_plane(plane, timing_planes, plane_idx)
-            line_window_ns, line_step_ns = self._line_timing(plane, timing_plane)
+            line_window_ns, line_step_ns = self._line_timing(plane, timing_plane, override_duration_ns)
             width_byte = plane.width_byte
             stride = self._plane_stride(plane)
             plane_base = self.config.base_dva + plane.byte_offset
@@ -84,7 +92,7 @@ class ImageDMA(BaseDMA):
                     first_delta = None
         return txns
 
-    def _generate_tile(self, start_ns: float, dep_ref: str | None, delta_ns: float | None) -> list:
+    def _generate_tile(self, start_ns: float, dep_ref: str | None, delta_ns: float | None, override_duration_ns: float | None) -> list:
         plane = plane_specs(self.config.format or "", self.config.width or 0, self.config.height or 0)[0]
         timing_plane = self._timing_plane(plane, self._timing_planes(), 0)
         pattern = Tile2DPattern(
@@ -97,6 +105,8 @@ class ImageDMA(BaseDMA):
             bus_width_byte=self.txn_size_byte,
         )
         total_timing_ns = max(0.001, self.line_interval_ns(timing_plane.width_px) * max(1, timing_plane.height_px))
+        if override_duration_ns is not None and override_duration_ns > total_timing_ns:
+            total_timing_ns = override_duration_ns
         txns = []
         addresses = pattern.generate()
         beat_interval = max(0.001, total_timing_ns / max(len(addresses), 1))
@@ -115,56 +125,64 @@ class ImageDMA(BaseDMA):
             first_delta = None
         return txns
 
-    def _generate_sbwc(self, start_ns: float, dep_ref: str | None, delta_ns: float | None) -> list:
-        layout = SBWCLayout(
-            base_dva=self.config.base_dva,
-            format=self.config.format or "",
-            width=self.config.width or 0,
-            height=self.config.height or 0,
-            sbwc_align_byte=self.config.sbwc_align_byte,
-            comp_ratio=self.config.comp_ratio,
-        )
-        timing_plane = self._timing_plane(
-            plane_specs(self.config.format or "", self.config.width or 0, self.config.height or 0)[0],
-            self._timing_planes(),
-            0,
-        )
-        line_window_ns = max(0.001, self.line_interval_ns(timing_plane.width_px))
-        total_timing_ns = max(line_window_ns, line_window_ns * max(1, timing_plane.height_px))
-        header_beats = ceil(layout.header_line_size_byte() / self.txn_size_byte)
-        payload_beats = ceil(layout.payload_line_size_byte() / self.txn_size_byte)
-        beat_interval = max(0.001, line_window_ns / max(header_beats + payload_beats, 1))
-        line_step_ns = max(0.001, total_timing_ns / max(layout.aligned_height(), 1))
-
+    def _generate_sbwc(self, start_ns: float, dep_ref: str | None, delta_ns: float | None, override_duration_ns: float | None) -> list:
         txns = []
         first_dep = dep_ref
         first_delta = delta_ns
-        for line in range(layout.aligned_height()):
-            line_ts = start_ns + line * line_step_ns
-            header_base = layout.header_base() + line * layout.header_line_size_byte()
-            payload_base = layout.payload_base() + line * layout.payload_line_size_byte()
+        timing_planes = self._timing_planes()
+        
+        current_base_dva = self.config.base_dva
+        for plane_idx, plane in enumerate(plane_specs(self.config.format or "", self.config.width or 0, self.config.height or 0)):
+            timing_plane = self._timing_plane(plane, timing_planes, plane_idx)
+            
+            layout = SBWCLayout(
+                base_dva=current_base_dva,
+                format=self.config.format or "",
+                width=plane.width_px,
+                height=plane.height_px,
+                sbwc_align_byte=self.config.sbwc_align_byte,
+                comp_ratio=self.config.comp_ratio,
+                bpp=plane.bpp,
+            )
+            
+            line_window_ns = max(0.001, self.line_interval_ns(timing_plane.width_px))
+            total_timing_ns = max(line_window_ns, line_window_ns * max(1, timing_plane.height_px))
+            if override_duration_ns is not None and override_duration_ns > total_timing_ns:
+                total_timing_ns = override_duration_ns
+            header_beats = ceil(layout.header_line_size_byte() / self.txn_size_byte)
+            payload_beats = ceil(layout.payload_line_size_byte() / self.txn_size_byte)
+            beat_interval = max(0.001, line_window_ns / max(header_beats + payload_beats, 1))
+            line_step_ns = max(0.001, total_timing_ns / max(layout.aligned_height(), 1))
 
-            for beat_idx in range(header_beats):
-                txns.append(
-                    self._new_txn(
-                        line_ts + beat_idx * beat_interval,
-                        header_base + beat_idx * self.txn_size_byte,
-                        sbwc="HEADER",
-                        dep_ref=first_dep,
-                        delta_ns=first_delta,
-                    )
-                )
-                first_dep = None
-                first_delta = None
+            for line in range(layout.aligned_height()):
+                line_ts = start_ns + line * line_step_ns
+                header_base = layout.header_base() + line * layout.header_line_size_byte()
+                payload_base = layout.payload_base() + line * layout.payload_line_size_byte()
 
-            for beat_idx in range(payload_beats):
-                txns.append(
-                    self._new_txn(
-                        line_ts + beat_idx * beat_interval,
-                        payload_base + beat_idx * self.txn_size_byte,
-                        sbwc="PAYLOAD",
-                        dep_ref="__header_line__" if beat_idx == 0 else None,
-                        delta_ns=0.0 if beat_idx == 0 else None,
+                for beat_idx in range(header_beats):
+                    txns.append(
+                        self._new_txn(
+                            line_ts + beat_idx * beat_interval,
+                            header_base + beat_idx * self.txn_size_byte,
+                            sbwc="HEADER",
+                            dep_ref=first_dep,
+                            delta_ns=first_delta,
+                        )
                     )
-                )
+                    first_dep = None
+                    first_delta = None
+
+                for beat_idx in range(payload_beats):
+                    txns.append(
+                        self._new_txn(
+                            line_ts + beat_idx * beat_interval,
+                            payload_base + beat_idx * self.txn_size_byte,
+                            sbwc="PAYLOAD",
+                            dep_ref="__header_line__" if beat_idx == 0 else None,
+                            delta_ns=0.0 if beat_idx == 0 else None,
+                        )
+                    )
+            
+            current_base_dva += layout.header_total_size_byte() + layout.payload_total_size_byte()
+
         return txns
