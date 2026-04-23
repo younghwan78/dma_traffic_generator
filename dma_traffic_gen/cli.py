@@ -25,6 +25,7 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--window-us", type=int, default=10)
     run.add_argument("--no-comments", action="store_true")
     run.add_argument("--no-graph", action="store_true")
+    run.add_argument("--split-by-dma", action="store_true", help="Output separate traffic files for each DMA port")
     run.add_argument("--verbose", action="store_true")
 
     validate = sub.add_parser("validate", help="Validate configs only")
@@ -82,6 +83,26 @@ def run_command(args: argparse.Namespace) -> int:
         include_comments=not args.no_comments,
     )
     print("[INFO] Writing traffic.txt  ... done")
+
+    if getattr(args, "split_by_dma", False):
+        print("[INFO] Splitting traffic by DMA...")
+        by_port = {}
+        for txn in txns:
+            by_port.setdefault(txn.port, []).append(txn)
+        for port, port_txns in by_port.items():
+            port_cfgs = [cfg for cfg in merged if cfg.name == port]
+            safe_name = port.replace(".", "_")
+            writer.write(
+                output_dir / f"traffic_{safe_name}.txt",
+                port_txns,
+                port_cfgs,
+                scenario.name,
+                [ip.hw for ip in scenario.ips],
+                duration_ns=scenario.duration_ns,
+                frame_count=scenario.frame_count,
+                include_comments=not args.no_comments,
+            )
+        print(f"[INFO] Generated {len(by_port)} individual traffic files")
 
     summary = SummaryGenerator().generate(
         txns,
